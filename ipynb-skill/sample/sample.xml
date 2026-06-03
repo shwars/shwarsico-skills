@@ -1,0 +1,16 @@
+<notebook>
+  <cell type="md">
+   # Title
+   This is markdown cell...
+  </md>
+  <cell type="code">
+    <code>
+    import lib
+    print("Hello")
+    </code>
+    <output>
+     Hello
+     <img src="image-1.png"/>
+    </output>
+  </cell>
+</notebook>    

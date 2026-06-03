@@ -1,0 +1,4 @@
+interface:
+  display_name: "IPYNB Explorer"
+  short_description: "Inspect Jupyter notebooks from assistant workflows"
+  default_prompt: "Use $ipynb to inspect this notebook before reading raw .ipynb JSON."
