@@ -1,0 +1,4 @@
+interface:
+  display_name: "Soshnikov Style"
+  short_description: "Natural Russian writing in Soshnikov style"
+  default_prompt: "Use $soshnikov-style to draft or revise this Russian text in Dmitry Soshnikov style."
