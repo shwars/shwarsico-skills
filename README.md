@@ -14,6 +14,7 @@ Skills в этом репозитории - это переиспользуем�
 
 | Skill | Краткое описание |
 | --- | --- |
+| [`ai-studio-skill`](ai-studio-skill/) | Builds clean Python applications for Yandex AI Studio: Responses API, tools, RAG, MCP, Code Interpreter, images, OCR, and SpeechKit. |
 | [`ipynb-skill`](ipynb-skill/) | Облегчает кодинг-ассистенту анализ файлов Jupyter Notebooks `.ipynb`: обзор структуры notebook, извлечение code/markdown/output/images, поиск по ячейкам и навигация. Использует разработанный дла этого CLI-инструмент `ipynb-tool`. |
 
 ## Установка (на примере `ipynb-skill`)

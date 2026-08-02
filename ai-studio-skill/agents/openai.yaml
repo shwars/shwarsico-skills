@@ -1,0 +1,4 @@
+interface:
+  display_name: "Yandex AI Studio"
+  short_description: "Build Yandex AI Studio apps with Responses API"
+  default_prompt: "Use $ai-studio to build a minimal Yandex AI Studio Responses API application."
