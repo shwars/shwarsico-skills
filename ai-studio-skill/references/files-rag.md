@@ -9,7 +9,7 @@
 - Add in-memory content
 - Cleanup
 
-Assume `client` and `text_model` come from `responses.md`.
+Assume `client` comes from `responses.md` and `qwen3_model` from `models.md`.
 
 ## Upload and index files
 
@@ -69,7 +69,7 @@ file_search = {
 }
 
 response = client.responses.create(
-    model=text_model,
+    model=qwen3_model,
     instructions=(
         "Answer from the indexed files, name the sources, and say when the "
         "answer is not present in the knowledge base."

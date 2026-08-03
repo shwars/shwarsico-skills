@@ -80,7 +80,7 @@ def extract_lines(ocr_result: dict) -> list[dict]:
 
 ## Multimodal Responses API alternative
 
-Use a vision model when the user needs semantic explanation rather than precise OCR geometry. Use the shared setup from `responses.md`.
+Use `qwen36_model` when the user needs semantic explanation rather than precise OCR geometry. Use the shared client setup from `responses.md` and the URI from `models.md`.
 
 ```python
 import base64
@@ -90,7 +90,7 @@ with open("document.png", "rb") as file_handle:
     encoded = base64.b64encode(file_handle.read()).decode("ascii")
 
 response = client.responses.create(
-    model=vision_model,
+    model=qwen36_model,
     input=[
         {
             "role": "user",

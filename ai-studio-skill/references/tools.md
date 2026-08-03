@@ -8,7 +8,7 @@
 - MCP approvals
 - Inspecting tool activity
 
-Assume `client` and `text_model` come from `responses.md`.
+Assume `client` comes from `responses.md` and `qwen3_model` from `models.md`.
 
 ## Local Pydantic function calling
 
@@ -43,7 +43,7 @@ tools = [
 ]
 
 response = client.responses.create(
-    model=text_model,
+    model=qwen3_model,
     instructions="Use the tool for calculations.",
     input="What is the square root of 2026?",
     tools=tools,
@@ -68,7 +68,7 @@ while True:
         )
 
     response = client.responses.create(
-        model=text_model,
+        model=qwen3_model,
         previous_response_id=response.id,
         input=outputs,
         tools=tools,
@@ -89,7 +89,7 @@ web_search = {
 }
 
 response = client.responses.create(
-    model=text_model,
+    model=qwen3_model,
     instructions="Search when current information is required and cite sources.",
     input="Find recent papers about multi-agent systems.",
     tools=[web_search],
@@ -113,7 +113,7 @@ mcp_tool = {
 }
 
 response = client.responses.create(
-    model=text_model,
+    model=qwen3_model,
     instructions="Use the research server to answer the question.",
     input="Find papers about visual transformers.",
     tools=[mcp_tool],
@@ -142,7 +142,7 @@ mcp_tools = [
 ]
 
 response = client.responses.create(
-    model=text_model,
+    model=qwen3_model,
     input="Research visual transformers and save a note.",
     tools=mcp_tools,
 )
@@ -161,7 +161,7 @@ approval_requests = [
 
 if approval_requests:
     response = client.responses.create(
-        model=text_model,
+        model=qwen3_model,
         previous_response_id=response.id,
         tools=[mcp_tool],
         input=[

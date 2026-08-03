@@ -7,7 +7,7 @@
 - Hosted Image Generation tool
 - Iterative prompt, generate, and evaluate loop
 
-Assume `client`, `folder_id`, `text_model`, and `vision_model` come from `responses.md`. Install Pillow with `pip install pillow`.
+Assume `client` and `folder_id` come from `responses.md`, and `qwen3_model`, `qwen36_model`, and `alice_art_model` come from `models.md`. Install Pillow with `pip install pillow`.
 
 ## Direct Images API to PIL
 
@@ -18,14 +18,13 @@ import io
 from PIL import Image
 
 
-image_model = f"art://{folder_id}/aliceai-image-art-3.0/latest"
-
-
 def generate_image(
     prompt: str,
-    model: str = image_model,
+    model: str = alice_art_model,
     size: str = "1536x1024",
 ) -> Image.Image:
+    if len(prompt) > 500:
+        raise ValueError("Alice AI ART prompts must not exceed 500 characters")
     response = client.images.generate(
         model=model,
         prompt=prompt,
@@ -48,15 +47,17 @@ from pathlib import Path
 
 concept = "a beautiful woman in an elegant cinematic portrait"
 prompt_response = client.responses.create(
-    model=text_model,
+    model=qwen3_model,
     instructions=(
-        "You are an art director. Return only one detailed image-generation "
-        "prompt describing subject, composition, lighting, color, and style."
+        "You are an art director. Return only one polished image-generation "
+        "prompt of at most 500 characters describing subject, composition, "
+        "lighting, color, and style."
     ),
     input=f"Create an image prompt for: {concept}",
 )
 
-image = generate_image(prompt_response.output_text)
+prompt = prompt_response.output_text.strip()
+image = generate_image(prompt)
 output_path = Path("portrait.jpg")
 image.convert("RGB").save(output_path, format="JPEG", quality=95)
 print(output_path.resolve())
@@ -74,7 +75,7 @@ from PIL import Image
 
 
 response = client.responses.create(
-    model=vision_model,
+    model=qwen36_model,
     instructions="Act as an art director and use image generation.",
     input="Create an image representing happiness.",
     tools=[{"type": "image_generation", "size": "1024x1024"}],
@@ -120,14 +121,18 @@ def draw_concept(concept: str, max_iterations: int = 3) -> Image.Image:
 
     for _ in range(max_iterations):
         prompt_response = client.responses.create(
-            model=text_model,
-            instructions="Return only a polished image-generation prompt.",
+            model=qwen3_model,
+            instructions=(
+                "Return only a polished image-generation prompt of at most "
+                "500 characters."
+            ),
             input=f"Concept: {concept}\nPrevious feedback: {feedback}",
         )
-        image = generate_image(prompt_response.output_text)
+        prompt = prompt_response.output_text.strip()
+        image = generate_image(prompt)
 
         evaluation = client.responses.parse(
-            model=vision_model,
+            model=qwen36_model,
             input=[
                 {
                     "role": "user",

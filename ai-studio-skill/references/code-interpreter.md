@@ -8,7 +8,7 @@
 - Inspect code and download artifacts
 - Lifecycle and cleanup
 
-Assume `client` and `text_model` come from `responses.md`.
+Assume `client` comes from `responses.md` and `qwen3_model` from `models.md`.
 
 Never execute model-generated Python locally with `exec`. Use the hosted Code Interpreter sandbox.
 
@@ -16,7 +16,7 @@ Never execute model-generated Python locally with `exec`. Use the hosted Code In
 
 ```python
 response = client.responses.create(
-    model=text_model,
+    model=qwen3_model,
     instructions="Use Python for every calculation.",
     input="Calculate the first 20 Fibonacci numbers and summarize the pattern.",
     tools=[
@@ -60,7 +60,7 @@ The model sees the uploaded file by its filename inside the container.
 
 ```python
 response = client.responses.create(
-    model=text_model,
+    model=qwen3_model,
     instructions=(
         "Read cities.xlsx, calculate Density = Population / Area_km2, "
         "save cities_with_density.xlsx, create density.png, and attach both files."
@@ -126,7 +126,7 @@ When no explicit container reuse is needed, attach uploaded file IDs directly:
 
 ```python
 response = client.responses.create(
-    model=text_model,
+    model=qwen3_model,
     input="Analyze the uploaded spreadsheet and create summary.xlsx.",
     include=["code_interpreter_call.outputs"],
     tools=[

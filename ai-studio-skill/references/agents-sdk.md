@@ -31,10 +31,12 @@ def create_agents_model(
         api_key=api_key,
         project=folder_id,
     )
-    return OpenAIResponsesModel(
-        model=f"gpt://{folder_id}/qwen3-235b-a22b-fp8/latest",
+    qwen3_model = f"gpt://{folder_id}/qwen3-235b-a22b-fp8"
+    agents_model = OpenAIResponsesModel(
+        model=qwen3_model,
         openai_client=client,
     )
+    return agents_model
 
 
 @function_tool
@@ -45,10 +47,10 @@ def word_count(text: str) -> str:
 
 async def main() -> None:
     set_tracing_disabled(True)
-    model = create_agents_model()
+    agents_model = create_agents_model()
     agent = Agent(
         name="Editor",
-        model=model,
+        model=agents_model,
         instructions="Answer concisely and use the word-count tool when needed.",
         tools=[word_count],
     )

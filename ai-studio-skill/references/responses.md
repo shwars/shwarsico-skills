@@ -2,13 +2,13 @@
 
 ## Contents
 
-- Client and model setup
+- Client setup
 - Basic response and conversation
 - Pydantic structured output
 - Streaming
 - Multimodal image input
 
-## Client and model setup
+## Client setup
 
 Install the common dependencies with `pip install openai python-dotenv pydantic pillow`.
 
@@ -40,22 +40,22 @@ def create_client(
 
 
 client, folder_id = create_client()
-text_model = f"gpt://{folder_id}/qwen3-235b-a22b-fp8/latest"
-vision_model = f"gpt://{folder_id}/qwen3.6-35b-a3b/latest"
 ```
+
+Append only the concrete URI variables needed from `models.md`. The examples below use `qwen3_model` for text and `qwen36_model` for image input.
 
 ## Basic response and conversation
 
 ```python
 response = client.responses.create(
-    model=text_model,
+    model=qwen3_model,
     instructions="Answer clearly and briefly.",
     input="Explain the Responses API in two sentences.",
 )
 print(response.output_text)
 
 follow_up = client.responses.create(
-    model=text_model,
+    model=qwen3_model,
     previous_response_id=response.id,
     input="Give me one minimal use case.",
 )
@@ -77,7 +77,7 @@ class ArticleSummary(BaseModel):
 
 
 response = client.responses.parse(
-    model=text_model,
+    model=qwen3_model,
     input="Summarize: AI agents can call tools and maintain conversation context.",
     text_format=ArticleSummary,
 )
@@ -92,7 +92,7 @@ Use `responses.parse`, not manual JSON extraction, whenever the caller wants typ
 
 ```python
 with client.responses.stream(
-    model=text_model,
+    model=qwen3_model,
     input="Write a short birthday toast.",
 ) as stream:
     for event in stream:
@@ -124,7 +124,7 @@ def image_data_url(image: Image.Image) -> str:
 
 image = Image.open("photo.jpg")
 response = client.responses.create(
-    model=vision_model,
+    model=qwen36_model,
     input=[
         {
             "role": "user",
