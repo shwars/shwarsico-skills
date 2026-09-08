@@ -1,0 +1,6 @@
+interface:
+  display_name: "Markmap Mindmaps"
+  short_description: "Turn text into editable, interactive mindmaps"
+  default_prompt: "Use $mindmap-js-skill to turn this text into a mindmap and show an interactive preview."
+policy:
+  allow_implicit_invocation: true

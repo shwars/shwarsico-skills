@@ -6,6 +6,8 @@ Skills в этом репозитории - это переиспользуем�
 
 В основном скиллы "под капотом" используют Python, с помощью пакетного менеджера `uv`. Он должен быть установлен у вас для корректной работы.
 
+Для рендеринга mindmap с помощью `mindmap-js-skill` нужны Node.js 20+ и npm. Зависимости устанавливаются командой `npm ci --ignore-scripts --no-audit --no-fund` из папки скилла.
+
 > Скиллы разработаны [Дмитрием Сошниковым](https://soshnikov.com), автором канала
 [Облачный адвокат](http://t.me/shwarsico).
 
@@ -17,6 +19,7 @@ Skills в этом репозитории - это переиспользуем�
 | [`ipynb-skill`](ipynb-skill/) | Облегчает кодинг-ассистенту анализ файлов Jupyter Notebooks `.ipynb`: обзор структуры notebook, извлечение code/markdown/output/images, поиск по ячейкам и навигация. Использует разработанный дла этого CLI-инструмент `ipynb-tool`. |
 | [`ai-studio-skill`](ai-studio-skill/) | Builds clean Python applications for Yandex AI Studio: Responses API, tools, RAG, MCP, Code Interpreter, images, OCR, and SpeechKit. |
 | [`soshnikov-style`](soshnikov-style/) | Пишет текст в стиле Дмитрия Сошникова. Основано на его постах в блоге и контенте из телеграм-канала.|
+| [`mindmap-js-skill`](mindmap-js-skill/) | Превращает текст в редактируемые mindmap на Markmap.js и создаёт интерактивный HTML-просмотр. Поддерживает offline/CDN-режимы; экспорт PNG/SVG выполняет кодинг-ассистент доступными браузерными инструментами. |
 
 ## Установка (на примере `ipynb-skill`)
 

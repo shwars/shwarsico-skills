@@ -1,0 +1,16 @@
+{
+  "name": "mindmap-js-skill",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Portable HTML rendering helper for the Markmap mindmap skill",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "markmap-cli": "0.18.12"
+  }
+}
