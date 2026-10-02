@@ -4,6 +4,17 @@ import html
 import json
 from pathlib import Path
 import re
+import sys
+
+
+EDITING_COMMANDS = {
+    "replace-cell",
+    "insert-cell",
+    "delete-cells",
+    "move-cells",
+    "export-percent",
+    "import-percent",
+}
 
 
 IMAGE_MIME_EXTENSIONS = {
@@ -17,6 +28,12 @@ IMAGE_MIME_EXTENSIONS = {
 
 
 def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] in EDITING_COMMANDS:
+        from .editing import main as editing_main
+
+        return editing_main(argv)
+
     args = build_parser().parse_args(argv)
     notebook_path = Path(args.notebook)
     notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
@@ -29,7 +46,11 @@ def main(argv=None):
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="ipynb-tool",
-        description="Read and explore Jupyter .ipynb notebooks.",
+        description="Inspect and safely edit Jupyter .ipynb notebooks.",
+        epilog=(
+            "Editing commands: replace-cell, insert-cell, delete-cells, "
+            "move-cells, export-percent, import-percent"
+        ),
     )
     parser.add_argument("notebook", help="Path to a .ipynb notebook.")
 
@@ -54,6 +75,7 @@ def build_parser():
     parser.add_argument("--around", type=int, default=0, help="Include N neighboring cells around search matches.")
     parser.add_argument("--metadata", action="store_true", help="Include notebook and cell metadata.")
     parser.add_argument("--execution", action="store_true", help="Show execution counts and out-of-order warnings.")
+    parser.add_argument("--cell-ids", action="store_true", help="List cell indexes, types, and stable cell IDs.")
 
     parser.add_argument(
         "--images",
@@ -84,6 +106,8 @@ def render_notebook(notebook, notebook_path, args):
         execution = render_execution(notebook, selected_indexes)
         if execution:
             parts.append(execution)
+    if args.cell_ids:
+        parts.append(render_cell_ids(notebook, selected_indexes))
 
     content_requested = requested_content(args)
     if args.search and not any(content_requested.values()):
@@ -238,6 +262,16 @@ def render_execution(notebook, selected_indexes):
             previous = count
         lines.append(f"{index + 1}: execution_count={count}{marker}")
     return "\n".join(lines) if len(lines) > 1 else ""
+
+
+def render_cell_ids(notebook, selected_indexes):
+    cells = notebook.get("cells", [])
+    lines = ["Cell IDs"]
+    for index in selected_indexes:
+        cell = cells[index]
+        cell_id = cell.get("id") or "<none>"
+        lines.append(f"{index + 1}: {cell.get('cell_type', 'unknown')} id={cell_id}")
+    return "\n".join(lines)
 
 
 def render_content(notebook, selected_indexes, args, content_requested, image_state):

@@ -18,11 +18,13 @@ def make_notebook():
         "metadata": {"kernelspec": {"name": "python3"}},
         "cells": [
             {
+                "id": "title",
                 "cell_type": "markdown",
                 "metadata": {},
                 "source": ["# Title\n", "Intro text\n"],
             },
             {
+                "id": "hello",
                 "cell_type": "code",
                 "metadata": {},
                 "execution_count": 2,
@@ -37,11 +39,13 @@ def make_notebook():
                 ],
             },
             {
+                "id": "details",
                 "cell_type": "markdown",
                 "metadata": {},
                 "source": ["## Details\n", "More notes\n"],
             },
             {
+                "id": "failure",
                 "cell_type": "code",
                 "metadata": {},
                 "execution_count": 1,
@@ -56,6 +60,7 @@ def make_notebook():
                 ],
             },
             {
+                "id": "long-value",
                 "cell_type": "code",
                 "metadata": {},
                 "execution_count": None,
@@ -148,6 +153,14 @@ class CliTests(unittest.TestCase):
         output = render(parse_args("--output", "--images", "base64"))
 
         self.assertIn(f"data:image/png;base64,{PNG_DATA}", output)
+
+    def test_cell_ids_lists_stable_identifiers(self):
+        output = render(parse_args("--cell-ids", "--cells", "2-3"))
+
+        self.assertIn("Cell IDs", output)
+        self.assertIn("2: code id=hello", output)
+        self.assertIn("3: markdown id=details", output)
+        self.assertNotIn("1: markdown", output)
 
 
 if __name__ == "__main__":

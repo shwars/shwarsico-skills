@@ -1,2 +1,1 @@
-"""Tools for inspecting Jupyter notebooks."""
-
+"""Tools for inspecting and safely editing Jupyter notebooks."""

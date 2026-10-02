@@ -1,9 +1,12 @@
 [project]
 name = "ipynb-tool"
-version = "0.1.0"
-description = "Inspect Jupyter notebooks from the command line."
+version = "0.2.0"
+description = "Inspect and safely edit Jupyter notebooks from the command line."
 requires-python = ">=3.9"
-dependencies = []
+dependencies = [
+    "jupytext>=1.18,<2",
+    "nbformat>=5.10,<6",
+]
 
 [project.scripts]
 ipynb-tool = "ipynb_tool.cli:main"
