@@ -7,7 +7,7 @@
 - Hosted Image Generation tool
 - Iterative prompt, generate, and evaluate loop
 
-Assume `client` and `folder_id` come from `responses.md`, and `qwen3_model`, `qwen36_model`, and `alice_art_model` come from `models.md`. Install Pillow with `pip install pillow`.
+Assume `client` and `folder_id` come from `responses.md`, and `deepseek41_model`, `qwen36_model`, and `alice_art_model` come from `models.md`. Install Pillow with `pip install pillow`.
 
 ## Direct Images API to PIL
 
@@ -47,7 +47,7 @@ from pathlib import Path
 
 concept = "a beautiful woman in an elegant cinematic portrait"
 prompt_response = client.responses.create(
-    model=qwen3_model,
+    model=deepseek41_model,
     instructions=(
         "You are an art director. Return only one polished image-generation "
         "prompt of at most 500 characters describing subject, composition, "
@@ -121,7 +121,7 @@ def draw_concept(concept: str, max_iterations: int = 3) -> Image.Image:
 
     for _ in range(max_iterations):
         prompt_response = client.responses.create(
-            model=qwen3_model,
+            model=deepseek41_model,
             instructions=(
                 "Return only a polished image-generation prompt of at most "
                 "500 characters."

@@ -42,20 +42,20 @@ def create_client(
 client, folder_id = create_client()
 ```
 
-Append only the concrete URI variables needed from `models.md`. The examples below use `qwen3_model` for text and `qwen36_model` for image input.
+Append only the concrete URI variables needed from `models.md`. The examples below use `deepseek41_model` for text and `qwen36_model` for image input.
 
 ## Basic response and conversation
 
 ```python
 response = client.responses.create(
-    model=qwen3_model,
+    model=deepseek41_model,
     instructions="Answer clearly and briefly.",
     input="Explain the Responses API in two sentences.",
 )
 print(response.output_text)
 
 follow_up = client.responses.create(
-    model=qwen3_model,
+    model=deepseek41_model,
     previous_response_id=response.id,
     input="Give me one minimal use case.",
 )
@@ -77,7 +77,7 @@ class ArticleSummary(BaseModel):
 
 
 response = client.responses.parse(
-    model=qwen3_model,
+    model=deepseek41_model,
     input="Summarize: AI agents can call tools and maintain conversation context.",
     text_format=ArticleSummary,
 )
@@ -92,7 +92,7 @@ Use `responses.parse`, not manual JSON extraction, whenever the caller wants typ
 
 ```python
 with client.responses.stream(
-    model=qwen3_model,
+    model=deepseek41_model,
     input="Write a short birthday toast.",
 ) as stream:
     for event in stream:

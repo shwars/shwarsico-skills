@@ -31,9 +31,9 @@ def create_agents_model(
         api_key=api_key,
         project=folder_id,
     )
-    qwen3_model = f"gpt://{folder_id}/qwen3-235b-a22b-fp8"
+    deepseek41_model = f"gpt://{folder_id}/deepseek-v4.1-flash"
     agents_model = OpenAIResponsesModel(
-        model=qwen3_model,
+        model=deepseek41_model,
         openai_client=client,
     )
     return agents_model

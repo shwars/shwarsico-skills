@@ -80,7 +80,7 @@ def extract_lines(ocr_result: dict) -> list[dict]:
 
 ## Multimodal Responses API alternative
 
-Use `qwen36_model` when the user needs semantic explanation rather than precise OCR geometry. Use the shared client setup from `responses.md` and the URI from `models.md`.
+Use `qwen36_model` or `deepseek41_model` when the user needs semantic explanation rather than precise OCR geometry. Both are vision models that accept Base64 images. Use the shared client setup from `responses.md` and the URI from `models.md`.
 
 ```python
 import base64
