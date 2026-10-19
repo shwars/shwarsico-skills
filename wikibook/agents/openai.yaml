@@ -1,0 +1,4 @@
+interface:
+  display_name: "Wikibook"
+  short_description: "Подробная wiki и граф знаний по книгам и циклам"
+  default_prompt: "Используй $wikibook, чтобы создать или продолжить подробную wiki по книге с источниками, таймлайнами и аудитом."

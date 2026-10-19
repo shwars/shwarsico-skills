@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4e8d0">
+  <meta name="description" content="Кукольный спектакль с цветными фигурками и репликами.">
+  <title>Кукольный спектакль</title>
+  <link rel="stylesheet" href="assets/fonts/fonts.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="data.js" defer></script>
+  <script src="engine.js" defer></script>
+  <script src="renderer.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <svg class="icon-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="icon-play" viewBox="0 0 24 24"><path d="m8 4 12 8-12 8Z"/></symbol>
+    <symbol id="icon-pause" viewBox="0 0 24 24"><path d="M8 4v16M16 4v16"/></symbol>
+    <symbol id="icon-next" viewBox="0 0 24 24"><path d="M4 12h15m-6-6 6 6-6 6"/></symbol>
+    <symbol id="icon-restart" viewBox="0 0 24 24"><path d="M4 9a8 8 0 1 1 0 7M4 3v6h6"/></symbol>
+    <symbol id="icon-expand" viewBox="0 0 24 24"><path d="M9 4H4v5m11-5h5v5M4 15v5h5m11-5v5h-5"/></symbol>
+    <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+  </svg>
+  <main class="theater-page">
+    <header class="page-heading">
+      <div><h1>Кукольный спектакль</h1><p>Бумажный театр</p></div>
+      <p class="running-time"></p>
+    </header>
+    <section class="player" id="player" aria-label="Кукольный спектакль">
+      <div class="proscenium" id="stage-frame">
+        <div class="stage" id="stage">
+          <canvas id="canvas" width="1516" height="680" role="img" aria-label="Цветные фигурки разыгрывают спектакль.">Для спектакля нужен браузер с поддержкой Canvas.</canvas>
+          <div class="appointment" id="appointment" hidden></div>
+          <div class="curtain-cover" id="curtain-cover"></div>
+          <div class="stage-overlay" id="stage-overlay">
+            <p class="overlay-title" id="overlay-title">Занавес скоро откроется</p>
+            <p id="load-status" role="status">Готовим сцену…</p>
+            <progress id="load-progress" max="13" value="0" aria-label="Подготовка спектакля"></progress>
+            <button class="button primary start-button" id="start" type="button" disabled>
+              <svg class="icon" aria-hidden="true"><use href="#icon-play"/></svg><span>Начать спектакль</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="dialogue" id="dialogue" aria-hidden="true" hidden>
+        <span class="speaker" id="speaker"></span><p id="speech"></p><span class="bubble-tail" id="bubble-tail"></span>
+      </div>
+      <p class="sr-only" id="spoken-line" role="status" aria-live="polite" aria-atomic="true"></p>
+      <div class="playback-panel">
+        <div class="scene-heading"><p id="scene-title">Сцена</p><span id="scene-counter"></span></div>
+        <div class="timeline-row">
+          <div class="timeline-track">
+            <div class="scene-marks" id="scene-marks" aria-hidden="true"></div>
+            <input id="timeline" type="range" min="0" max="1" step="0.1" value="0" aria-label="Время спектакля" aria-valuetext="0 минут 0 секунд" disabled>
+          </div>
+          <output id="time-label" for="timeline" aria-live="off">0:00 / 0:00</output>
+        </div>
+        <div class="transport">
+          <div class="transport-main">
+            <button class="button primary" id="play" type="button" disabled><svg class="icon" aria-hidden="true"><use href="#icon-play"/></svg><span>Начать</span></button>
+            <button class="button" id="next" type="button" disabled><span>Далее</span><svg class="icon" aria-hidden="true"><use href="#icon-next"/></svg></button>
+            <button class="button" id="restart" type="button" aria-label="Начать спектакль сначала" disabled><svg class="icon" aria-hidden="true"><use href="#icon-restart"/></svg><span>Сначала</span></button>
+          </div>
+          <div class="transport-options">
+            <label class="speed-label" for="speed">Скорость <select id="speed" disabled><option value="0.75">0,75×</option><option value="1" selected>1×</option><option value="1.25">1,25×</option><option value="1.5">1,5×</option><option value="2">2×</option></select></label>
+            <button class="button fullscreen-button" id="fullscreen" type="button" aria-label="На весь экран" aria-pressed="false" disabled><svg class="icon" aria-hidden="true"><use href="#icon-expand"/></svg><span>На весь экран</span></button>
+          </div>
+        </div>
+        <nav class="scene-nav" aria-label="Выбор сцены"></nav>
+        <p class="player-status" id="player-status" role="status"></p>
+        <p class="keyboard-help">Пробел — пауза <span>Вправо — реплика</span> <span>1–9 — сцены</span> <span>R — повтор</span></p>
+      </div>
+    </section>
+    <footer class="colophon">
+      <details><summary>О постановке и источниках</summary>
+        <div id="adaptation-notes"></div>
+        <p>Адреса источников сохранены в <a href="script.json">сценарии</a>. Спектакль идёт без звука.</p>
+        <p>Шрифт PT Sans — ParaType, <a href="assets/fonts/OFL.txt">SIL Open Font License</a>.</p>
+      </details>
+    </footer>
+  </main>
+  <noscript><p class="noscript">Для спектакля включите JavaScript. Приложение работает локально и не отправляет данные в сеть.</p></noscript>
+</body>
+</html>

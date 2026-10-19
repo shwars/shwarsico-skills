@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sprite Theater"
+  short_description: "Кукольные спектакли по текстам и книжным wiki"
+  default_prompt: "Используй $sprite-theater, чтобы создать кукольный спектакль по тексту или wiki с согласованными персонажами и проигрывателем pygame или web."
