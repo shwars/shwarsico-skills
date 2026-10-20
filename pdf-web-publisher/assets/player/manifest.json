@@ -1,0 +1,6 @@
+{
+  "generator": "pdf-web-publisher",
+  "version": "1.0.0",
+  "data_version": 1,
+  "files": ["common.js", "gallery.js", "viewer.js", "styles.css", "manifest.json"]
+}

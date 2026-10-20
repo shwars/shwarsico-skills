@@ -1,0 +1,4 @@
+interface:
+  display_name: "PDF Web Publisher"
+  short_description: "Publish PDFs as portable image-only slide archives"
+  default_prompt: "Use $pdf-web-publisher to turn this PDF into a portable presentation archive."
