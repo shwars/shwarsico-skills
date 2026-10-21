@@ -1,7 +1,7 @@
 /* Optional development check: requires Playwright and its Chromium browser.
  * node test_browser.cjs <preview-parent> <screenshot-directory>
  * Preview parent must have <theme>/nested/site/presentations for each theme.
- * The preview fixture is external; this script never modifies source decks.
+ * Rename/edit cases use isolated copies; original preview decks stay unchanged.
  */
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
@@ -17,8 +17,9 @@ async function main() {
   const server = http.createServer(async (request, response) => {
     try {
       const name = decodeURIComponent(new URL(request.url, "http://localhost").pathname);
-      const filename = path.resolve(base, `.${name}`);
+      let filename = path.resolve(base, `.${name}`);
       if (!filename.startsWith(`${base}${path.sep}`)) throw new Error("Outside fixture");
+      if ((await fs.stat(filename)).isDirectory()) filename = path.join(filename, "index.html");
       const data = await fs.readFile(filename);
       response.setHeader("Content-Type", ({ ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css", ".webp": "image/webp" })[path.extname(filename)] || "application/octet-stream");
       response.end(data);
@@ -31,6 +32,7 @@ async function main() {
   const errors = [];
   let checks = 0;
   const themes = ["programme", "screening-room", "field-notes"];
+  const cases = await fs.mkdtemp(path.join(base, ".browser-cases-"));
   try {
     for (const theme of themes) {
       for (const protocol of ["file", "http"]) {
@@ -147,11 +149,58 @@ async function main() {
     assert.equal(await unsafePage.evaluate(() => window.__unsafeMetadata), undefined);
     await unsafePage.close();
     checks++;
+
+    // Move a deck and change just its catalog link; its internal files must not
+    // need regeneration. Then edit metadata and reload without a rebuild.
+    for (const theme of themes) {
+      const archive = path.join(cases, theme, "presentations");
+      await fs.cp(path.join(base, theme, "nested", "site", "presentations"), archive, { recursive: true });
+      const original = await fs.readFile(path.join(archive, "working-system", "deck.js"));
+      await fs.rename(path.join(archive, "working-system"), path.join(archive, "renamed-talk"));
+      const catalogPath = path.join(archive, "catalog.js");
+      const source = await fs.readFile(catalogPath, "utf8");
+      const catalog = JSON.parse(source.slice(source.indexOf("=") + 1).trim().replace(/;$/, ""));
+      const entry = catalog.presentations.find((item) => item.href === "working-system/index.html");
+      entry.href = "renamed-talk/index.html";
+      await fs.writeFile(catalogPath, `window.PDFWebPublisherCatalog = ${JSON.stringify(catalog, null, 2)};\n`);
+      assert.deepEqual(await fs.readFile(path.join(archive, "renamed-talk", "deck.js")), original);
+      const relative = path.relative(base, archive).split(path.sep).join("/");
+      for (const protocol of ["file", "http"]) {
+        const page = await browser.newPage();
+        page.on("pageerror", (error) => errors.push(error.message));
+        const rootURL = protocol === "file" ? pathToFileURL(path.join(archive, "index.html")).href : `${origin}/${relative}/index.html`;
+        await page.goto(rootURL);
+        const link = page.locator('.deck-link[href="renamed-talk/index.html"]');
+        await link.waitFor();
+        await page.waitForFunction(() => {
+          const image = document.querySelector('.deck-link[href="renamed-talk/index.html"] img');
+          return image.complete && image.naturalWidth > 0;
+        });
+        await link.click();
+        await page.locator("canvas:visible").waitFor();
+        const deckURL = page.url().split("#")[0];
+        const direct = protocol === "http" ? deckURL.replace(/index\.html$/, "") : deckURL;
+        await page.goto(`${direct}?from=catalog#slide=2`);
+        await page.locator("canvas:visible").waitFor();
+        assert.equal(await page.locator(".slide-counter").textContent(), "2 / 3");
+        entry.title = "Renamed talk — hand edited";
+        await fs.writeFile(catalogPath, `window.PDFWebPublisherCatalog = ${JSON.stringify(catalog, null, 4)};\n`);
+        await page.reload();
+        await page.getByRole("heading", { name: entry.title, exact: true }).waitFor();
+        await page.goto(rootURL);
+        await page.getByRole("heading", { name: entry.title, exact: true }).waitFor();
+        await page.close();
+        checks++;
+      }
+    }
     assert.deepEqual(errors, []);
     console.log(JSON.stringify({ passed: checks, browser: "chromium", pageErrors: errors, screenshots }, null, 2));
   } finally {
     await browser.close();
     await new Promise((resolve) => server.close(resolve));
+    // Only delete the unique temporary directory created by this run.
+    assert.ok(path.resolve(cases).startsWith(`${base}${path.sep}.browser-cases-`));
+    await fs.rm(cases, { recursive: true });
   }
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

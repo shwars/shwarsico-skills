@@ -1,12 +1,13 @@
 (() => {
   "use strict";
-  const { h, icon, button, metadata, notice, init } = window.PDFWebPublisher;
+  const { h, icon, button, metadata, notice, init, pageURL } = window.PDFWebPublisher;
   const state = init();
   if (!state) return;
   const { main, catalog } = state;
   const deck = window.PDFWebPublisherDeck;
-  const entry = deck && catalog.presentations.find((item) => item.slug === deck.slug);
-  if (!entry || deck.version !== 1 || !Array.isArray(deck.slides) || !deck.slides.length) {
+  const archiveURL = new URL("../index.html", location.href);
+  const entry = deck && catalog.presentations.find((item) => pageURL(item.href, archiveURL) === pageURL(location.href));
+  if (!entry || deck.version !== 2 || !Array.isArray(deck.slides) || !deck.slides.length) {
     main.append(notice("Presentation data could not be loaded. Keep this deck with its shared player and catalog, or run rebuild."));
     return;
   }

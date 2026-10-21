@@ -37,12 +37,12 @@
   const entries = catalog.presentations.map((entry, index) => {
     const row = h("li", "deck-entry");
     const link = h("a", "deck-link");
-    link.href = `${entry.slug}/index.html`;
+    link.href = entry.href;
     const ordinal = h("span", "deck-ordinal", String(index + 1).padStart(2, "0"));
     ordinal.setAttribute("aria-hidden", "true");
     const cover = h("div", "deck-cover");
     const image = h("img");
-    image.src = entry.cover;
+    image.src = new URL(entry.cover, link.href).href;
     image.alt = "";
     image.loading = index < 3 ? "eager" : "lazy";
     image.draggable = false;

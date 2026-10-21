@@ -113,7 +113,36 @@ class PublisherTests(unittest.TestCase):
         return publisher.publish(self.args("publish", "--slug", "one", *extras))
 
     def catalog(self):
-        return publisher.read_json(self.root / "presentations.json")
+        return publisher.read_data(self.root / "catalog.js", publisher.CATALOG_VARIABLE)
+
+    def deck(self, slug="one"):
+        return publisher.read_data(self.root / slug / "deck.js", publisher.DECK_VARIABLE)
+
+    def save_catalog(self, value):
+        publisher.write_data(self.root / "catalog.js", publisher.CATALOG_VARIABLE, value)
+
+    def make_legacy_archive(self):
+        self.publish("--speaker", "Alice", "--tag", "AI")
+        catalog = self.catalog()
+        catalog["version"] = 1
+        for entry in catalog["presentations"]:
+            slug = publisher.entry_slug(entry)
+            deck = self.deck(slug)
+            deck.update(version=1, slug=slug)
+            publisher.write_json(self.root / slug / "deck.json", deck)
+            source = publisher.js_data(publisher.DECK_VARIABLE, deck).replace(publisher.MARKER, publisher.LEGACY_MARKER)
+            (self.root / slug / "deck.js").write_text(source, encoding="utf-8")
+            entry.pop("href")
+            entry.update(slug=slug, cover=f"{slug}/cover.webp")
+        publisher.write_json(self.root / "presentations.json", catalog)
+        source = publisher.js_data(publisher.CATALOG_VARIABLE, catalog).replace(publisher.MARKER, publisher.LEGACY_MARKER)
+        (self.root / "catalog.js").write_text(source, encoding="utf-8")
+        manifest = publisher.read_json(self.root / "player/manifest.json")
+        manifest.update(version="1.0.0", data_version=1)
+        publisher.write_json(self.root / "player/manifest.json", manifest)
+        for page in self.root.rglob("*.html"):
+            page.write_text(page.read_text(encoding="utf-8").replace(publisher.MARKER, publisher.LEGACY_MARKER), encoding="utf-8")
+        return catalog
 
     def test_portable_publish_and_defaults(self):
         result = self.publish()
@@ -121,7 +150,10 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(result["theme"], "programme")
         self.assertEqual(self.catalog()["presentations"][0]["title"], "Доклад <AI> & ideas")
         self.assertTrue(publisher.validate(self.args("validate"))["valid"])
-        deck = publisher.read_json(self.root / "one/deck.json")
+        deck = self.deck()
+        self.assertNotIn("slug", deck)
+        self.assertEqual(self.catalog()["presentations"][0]["href"], "one/index.html")
+        self.assertEqual([p.relative_to(self.root).as_posix() for p in self.root.rglob("*.json")], ["player/manifest.json"])
         self.assertEqual((deck["max_edge"], deck["quality"]), (1440, 55))
         self.assertEqual([(s["width"], s["height"]) for s in deck["slides"]], [(1440, 810), (720, 1440), (810, 1440)])
         for index, slide in enumerate(deck["slides"]):
@@ -160,7 +192,7 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(snapshot(self.root), before)
         self.publish("--replace", "--quality", "40")
         entries = self.catalog()["presentations"]
-        self.assertEqual([e["slug"] for e in entries], ["two", "one"])
+        self.assertEqual([e["href"] for e in entries], ["two/index.html", "one/index.html"])
         self.assertEqual(entries[1]["speaker"], "Alice")
         self.assertEqual(entries[1]["tags"], ["AI"])
         self.assertEqual(self.catalog()["site"]["theme"], "field-notes")
@@ -176,14 +208,14 @@ class PublisherTests(unittest.TestCase):
         catalog["presentations"].reverse()
         catalog["presentations"][0]["title"] = "</script><img src=x onerror=alert(1)>"
         catalog["site"].update(title="Archive & talks", theme="screening-room")
-        publisher.write_json(self.root / "presentations.json", catalog)
+        self.save_catalog(catalog)
         with self.assertRaisesRegex(publisher.PublishError, "Stale"):
             publisher.validate(self.args("validate"))
         publisher.rebuild(self.args("rebuild"))
         self.assertTrue(publisher.validate(self.args("validate"))["valid"])
         html = (self.root / "one/index.html").read_text(encoding="utf-8")
         self.assertIn("&lt;/script&gt;&lt;img", html)
-        self.assertEqual(self.catalog()["presentations"][0]["slug"], "one")
+        self.assertEqual(self.catalog()["presentations"][0]["href"], "one/index.html")
 
     def test_player_missing_incompatible_and_refresh(self):
         self.publish()
@@ -208,7 +240,7 @@ class PublisherTests(unittest.TestCase):
         make_pdf(self.source, title="")
         self.publish("--max-edge", "800", "--quality", "35", "--cover-page", "2")
         self.assertEqual(self.catalog()["presentations"][0]["title"], self.source.stem)
-        deck = publisher.read_json(self.root / "one/deck.json")
+        deck = self.deck()
         self.assertEqual(max(deck["slides"][0]["width"], deck["slides"][0]["height"]), 800)
         with Image.open(self.root / "one/cover.webp") as cover:
             self.assertGreater(cover.height, cover.width)
@@ -249,11 +281,11 @@ class PublisherTests(unittest.TestCase):
 
     def test_validation_missing_images_paths_and_sources(self):
         self.publish()
-        manifest = self.root / "one/deck.json"
+        manifest = self.root / "one/deck.js"
         original = manifest.read_bytes()
-        deck = publisher.read_json(manifest)
+        deck = self.deck()
         deck["slides"][0]["src"] = "slides/../../outside.webp"
-        publisher.write_json(manifest, deck)
+        publisher.write_data(manifest, publisher.DECK_VARIABLE, deck)
         with self.assertRaises(publisher.PublishError):
             publisher.validate(self.args("validate"))
         manifest.write_bytes(original)
@@ -261,7 +293,7 @@ class PublisherTests(unittest.TestCase):
         with self.assertRaisesRegex(publisher.PublishError, "source documents"):
             publisher.validate(self.args("validate"))
         (self.root / "source.pdf").unlink()
-        deck = publisher.read_json(manifest)
+        deck = self.deck()
         (self.root / "one" / deck["slides"][0]["src"]).unlink()
         with self.assertRaisesRegex(publisher.PublishError, "Missing local asset"):
             publisher.validate(self.args("validate"))
@@ -289,6 +321,141 @@ class PublisherTests(unittest.TestCase):
             result = publisher.main(["publish", str(self.base / "slides.pptx")])
         self.assertEqual(result, 1)
         self.assertIn("Export PPTX to PDF", errors.getvalue())
+
+    def test_readable_data_and_equivalent_hand_formatting(self):
+        self.publish()
+        path = self.root / "catalog.js"
+        source = path.read_text(encoding="utf-8")
+        self.assertIn('\n  "generator":', source)
+        self.assertIn("Доклад", source)
+        catalog = self.catalog()
+        # Header and semicolon are optional; whitespace and object key order do
+        # not change the authoritative data or require rebuilding companions.
+        path.write_text("\ufeff\nwindow.PDFWebPublisherCatalog = " + json.dumps(catalog, ensure_ascii=False, indent=4), encoding="utf-8")
+        before = snapshot(self.root)
+        self.assertTrue(publisher.validate(self.args("validate"))["valid"])
+        self.assertEqual(snapshot(self.root), before)
+        (self.root / "one/deck.js").write_text("window.PDFWebPublisherDeck = " + json.dumps(self.deck(), indent=4) + ";", encoding="utf-8")
+        self.assertTrue(publisher.validate(self.args("validate"))["valid"])
+
+    def test_rename_requires_only_folder_and_catalog_link(self):
+        self.publish("--speaker", "Alice")
+        original = snapshot(self.root / "one")
+        (self.root / "one").rename(self.root / "renamed")
+        catalog = self.catalog()
+        catalog["presentations"][0]["href"] = "renamed/index.html"
+        self.save_catalog(catalog)
+        self.assertTrue(publisher.validate(self.args("validate"))["valid"])
+        self.assertEqual(snapshot(self.root / "renamed"), original)
+        publisher.publish(self.args("publish", "--slug", "renamed", "--replace"))
+        self.assertEqual(len(self.catalog()["presentations"]), 1)
+        self.assertEqual(self.catalog()["presentations"][0]["speaker"], "Alice")
+        self.assertNotIn("slug", self.deck("renamed"))
+
+    def test_rebuild_recalculates_summary_from_authoritative_slides(self):
+        self.publish()
+        deck = self.deck()
+        deck["slides"].pop()
+        publisher.write_data(self.root / "one/deck.js", publisher.DECK_VARIABLE, deck)
+        with self.assertRaisesRegex(publisher.PublishError, "recalculate"):
+            publisher.validate(self.args("validate"))
+        publisher.rebuild(self.args("rebuild"))
+        self.assertEqual(self.catalog()["presentations"][0]["slide_count"], 2)
+        self.assertTrue(publisher.validate(self.args("validate"))["valid"])
+
+    def test_malformed_or_executable_data_is_rejected_without_changes(self):
+        self.publish()
+        path = self.root / "catalog.js"
+        original = path.read_text(encoding="utf-8")
+        invalid = [original.replace('"site": {', '"site": { // comment'),
+                   original.replace('"version": 2', '"version": 2,'),
+                   original.replace('"version": 2', '"version": NaN'),
+                   original.replace('"version": 2', '"version": 2, "version": 2'),
+                   original.replace('"version": 2', "'version': 2"),
+                   original + "\nwindow.unexpected = true;", original.replace("window.PDFWebPublisherCatalog", "window.other")]
+        for source in invalid:
+            with self.subTest(source=source[:40]):
+                path.write_text(source, encoding="utf-8")
+                before = snapshot(self.root)
+                with self.assertRaises(publisher.PublishError):
+                    publisher.rebuild(self.args("rebuild"))
+                self.assertEqual(snapshot(self.root), before)
+
+    def test_explicit_legacy_migration_and_repeat(self):
+        self.make_legacy_archive()
+        (self.root / "one/extra.txt").write_text("keep")
+        (self.root / "player/custom.txt").write_text("keep")
+        before_images = {k: v for k, v in snapshot(self.root).items() if k.endswith(".webp")}
+        before = snapshot(self.root)
+        for action in (lambda: publisher.validate(self.args("validate")), lambda: self.publish("--replace"),
+                       lambda: publisher.rebuild(self.args("rebuild"))):
+            with self.assertRaisesRegex(publisher.PublishError, "rebuild --refresh-player"):
+                action()
+            self.assertEqual(snapshot(self.root), before)
+        with patch.object(publisher, "render_pdf", side_effect=AssertionError("Migration must not rasterize PDFs")):
+            publisher.rebuild(self.args("rebuild", "--refresh-player"))
+        self.assertEqual(self.catalog()["version"], 2)
+        self.assertEqual(self.catalog()["presentations"][0]["href"], "one/index.html")
+        self.assertEqual(self.catalog()["presentations"][0]["cover"], "cover.webp")
+        self.assertEqual(self.catalog()["presentations"][0]["speaker"], "Alice")
+        self.assertNotIn("slug", self.deck())
+        self.assertFalse((self.root / "presentations.json").exists())
+        self.assertFalse((self.root / "one/deck.json").exists())
+        self.assertEqual({k: v for k, v in snapshot(self.root).items() if k.endswith(".webp")}, before_images)
+        self.assertEqual((self.root / "one/extra.txt").read_text(), "keep")
+        self.assertEqual((self.root / "player/custom.txt").read_text(), "keep")
+        self.assertTrue(publisher.validate(self.args("validate"))["valid"])
+        after = snapshot(self.root)
+        publisher.rebuild(self.args("rebuild", "--refresh-player"))
+        self.assertEqual(snapshot(self.root), after)
+
+    def test_legacy_removal_failure_rolls_back_entire_migration(self):
+        self.make_legacy_archive()
+        before = snapshot(self.root)
+        real_rename = Path.rename
+
+        def failing_remove(source, target):
+            if source.name == "deck.json" and Path(target).name.startswith("removed-"):
+                raise OSError("Simulated removal failure")
+            return real_rename(source, target)
+
+        with patch.object(Path, "rename", failing_remove):
+            with self.assertRaisesRegex(OSError, "removal failure"):
+                publisher.rebuild(self.args("rebuild", "--refresh-player"))
+        self.assertEqual(snapshot(self.root), before)
+
+    def test_migration_converts_unlisted_managed_decks_and_preserves_other_json(self):
+        import shutil
+        self.make_legacy_archive()
+        shutil.copytree(self.root / "one", self.root / "unlisted")
+        path = self.root / "unlisted/deck.json"
+        value = publisher.read_json(path)
+        value["slug"] = "unlisted"
+        publisher.write_json(path, value)
+        (path.with_suffix(".js")).write_text(publisher.js_data(publisher.DECK_VARIABLE, value).replace(publisher.MARKER, publisher.LEGACY_MARKER), encoding="utf-8")
+        unrelated = self.root / "notes/deck.json"
+        publisher.write_json(unrelated, {"note": "unrelated data"})
+        before = unrelated.read_bytes()
+        publisher.rebuild(self.args("rebuild", "--refresh-player"))
+        self.assertEqual(len(self.catalog()["presentations"]), 1)
+        self.assertFalse(path.exists())
+        self.assertNotIn("slug", self.deck("unlisted"))
+        self.assertEqual(unrelated.read_bytes(), before)
+        self.assertTrue(publisher.validate(self.args("validate"))["valid"])
+
+    def test_migration_refuses_to_overwrite_new_format_catalog_edits(self):
+        self.make_legacy_archive()
+        catalog = self.catalog()
+        catalog["version"] = 2
+        catalog["site"]["title"] = "A version-2 edit that must survive"
+        entry = catalog["presentations"][0]
+        entry["href"] = entry.pop("slug") + "/index.html"
+        entry["cover"] = "cover.webp"
+        self.save_catalog(catalog)
+        before = snapshot(self.root)
+        with self.assertRaises(publisher.PublishError):
+            publisher.rebuild(self.args("rebuild", "--refresh-player"))
+        self.assertEqual(snapshot(self.root), before)
 
 
 if __name__ == "__main__":

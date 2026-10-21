@@ -42,8 +42,17 @@ The source PDF must be outside the destination archive.
 ## Gallery and appearance
 
 The archive has one shared `player/` directory and one directory per deck.
-`presentations.json` is the editable catalog and controls presentation order.
+`catalog.js` is the editable catalog and controls presentation order.
 New decks are prepended; replacement preserves position and unspecified metadata.
+Each deck's `deck.js` is its authoritative slide list. Do not create duplicate
+JSON catalogs. Both files use indented JSON-compatible objects in their existing
+`window.PDFWebPublisherCatalog` / `window.PDFWebPublisherDeck` assignments.
+Use double-quoted keys/strings without comments or trailing commas inside data.
+
+Catalog entries have an `href`, such as `deck-one/index.html`, and a deck-relative
+cover path, such as `cover.webp`. Deck data has no slug. To rename a presentation,
+rename its directory and change only that catalog link; no internal edits or
+rebuild are needed. Use the new directory name with `--slug` for later replacement.
 
 Offer the bundled themes when appearance is unspecified, without blocking an
 ordinary publish: **Programme** (default: light gray and cobalt, cover-and-title
@@ -55,16 +64,22 @@ For bespoke interface changes use available design guidance, such as impeccable;
 preserve the shipped [design system](DESIGN.md). The stock themes do not require
 a separate design skill at publishing time.
 
-After editing catalog metadata or order, regenerate browser companions:
+Hand-edited data takes effect on reload. Refresh generated HTML titles/themes,
+or recalculate gallery counts after changing a deck's slide array, with:
 
 ```text
 uv run /skill/scripts/publish.py rebuild --output /website
 ```
 
 Read [the CLI and data reference](references/cli-and-format.md) for all options,
-schemas, player updates, and recovery. Never edit `catalog.js` or `deck.js` as the
-source of truth. Classic scripts are deliberate: JSON fetching and ES modules
-would break double-click viewing in common browsers.
+schemas, player updates, and recovery, and [the user guide](README.md) for the two
+ways to keep all talks in one publishing home. Classic scripts are deliberate:
+JSON fetching and ES modules would break double-click viewing in common browsers.
+
+Version-1 archives require explicit `rebuild --refresh-player` migration. It
+converts their legacy JSON sources, removes the obsolete JSON copies, and updates
+the player without rendering PDFs again. Do not migrate automatically on publish.
+The explicit refresh replaces customized managed player files, including CSS.
 
 ## Verify and deliver
 

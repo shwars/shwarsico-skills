@@ -20,7 +20,9 @@ slides on desktop or mobile. Authors choose a parent output directory.
 
 Convert PDF pages into compressed imagery in a self-contained presentations
 directory, usable by double-click or static hosting. Preserve a shared player
-and add new talks to an editable JSON catalog.
+and add new talks to an editable JavaScript catalog. Catalog and per-deck slide
+data each have one authoritative JavaScript file, without duplicate JSON copies.
+Renaming a deck directory requires changing only its link in the main catalog.
 
 ## Capabilities and Constraints
 

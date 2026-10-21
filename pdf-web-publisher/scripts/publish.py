@@ -21,9 +21,13 @@ import tempfile
 import unicodedata
 
 GENERATOR = "pdf-web-publisher"
-VERSION = 1
-PLAYER_VERSION = "1.0.0"
-MARKER = "pdf-web-publisher:generated v1"
+VERSION = 2
+PLAYER_VERSION = "2.0.0"
+MARKER = "pdf-web-publisher:generated v2"
+LEGACY_MARKER = "pdf-web-publisher:generated v1"
+CATALOG_VARIABLE = "PDFWebPublisherCatalog"
+DECK_VARIABLE = "PDFWebPublisherDeck"
+MIGRATION_HINT = "Version-1 archive found. Run rebuild --refresh-player to migrate its JSON sources to editable JavaScript."
 THEMES = ("programme", "screening-room", "field-notes")
 SKILL = Path(__file__).resolve().parents[1]
 ASSETS = SKILL / "assets" / "player"
@@ -55,9 +59,50 @@ def read_json(path):
         fail(f"Cannot read {path}: {exc}")
 
 
-def check_header(value, label):
-    if not isinstance(value, dict) or value.get("generator") != GENERATOR or value.get("version") != VERSION:
-        fail(f"{label} is not a supported {GENERATOR} manifest (version {VERSION}).")
+def check_header(value, label, version=VERSION):
+    if not isinstance(value, dict) or value.get("generator") != GENERATOR or value.get("version") != version:
+        if isinstance(value, dict) and value.get("generator") == GENERATOR and value.get("version") == 1 and version == VERSION:
+            fail(MIGRATION_HINT)
+        fail(f"{label} is not a supported {GENERATOR} manifest (version {version}).")
+
+
+def js_data(variable, value):
+    payload = json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False)
+    payload = payload.replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
+    return f"/* {MARKER} */\nwindow.{variable} = {payload};\n"
+
+
+def write_data(path, variable, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(js_data(variable, value), encoding="utf-8")
+
+
+def read_data(path, variable):
+    """Read a JSON object in a known assignment; never execute JavaScript."""
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"Duplicate key: {key}")
+            result[key] = value
+        return result
+
+    def invalid_constant(value):
+        raise ValueError(f"Not a JSON value: {value}")
+
+    try:
+        source = path.read_text(encoding="utf-8-sig")
+        wrapper = re.match(r"\s*(?:/\*\s*pdf-web-publisher:generated v[12]\s*\*/\s*)?window\."
+                           + re.escape(variable) + r"\s*=\s*", source)
+        if not wrapper:
+            raise ValueError(f"Expected window.{variable} = {{ ... }};")
+        decoder = json.JSONDecoder(object_pairs_hook=unique_object, parse_constant=invalid_constant)
+        value, end = decoder.raw_decode(source[wrapper.end():])
+        if source[wrapper.end() + end:].strip() not in ("", ";") or not isinstance(value, dict):
+            raise ValueError("Only a JSON object and an optional final semicolon are allowed")
+        return value
+    except (OSError, UnicodeError, ValueError) as exc:
+        fail(f"Cannot read {path}: {exc}. Use double-quoted JSON keys/strings, without comments or trailing commas inside the object.")
 
 
 def slugify(stem):
@@ -71,6 +116,15 @@ def slugify(stem):
 def check_slug(slug):
     if not isinstance(slug, str) or not SLUG_PATTERN.fullmatch(slug) or slug == "player":
         fail("Slug must be 1–80 lowercase ASCII letters, digits, or hyphens, start with a letter/digit, and cannot be 'player'.")
+
+
+def entry_slug(entry):
+    href = entry.get("href")
+    if not isinstance(href, str) or not href.endswith("/index.html"):
+        fail("Each presentation href must be 'deck-directory/index.html'.")
+    slug = href[:-len("/index.html")]
+    check_slug(slug)
+    return slug
 
 
 def local_file(root, relative):
@@ -99,7 +153,7 @@ def string_field(value, key, required=False):
 
 
 def check_catalog(catalog):
-    check_header(catalog, "presentations.json")
+    check_header(catalog, "catalog.js")
     site = catalog.get("site")
     if not isinstance(site, dict) or site.get("theme") not in THEMES:
         fail(f"site.theme must be one of: {', '.join(THEMES)}.")
@@ -111,8 +165,9 @@ def check_catalog(catalog):
     for entry in entries:
         if not isinstance(entry, dict):
             fail("Every presentation must be an object.")
-        slug = entry.get("slug")
-        check_slug(slug)
+        slug = entry_slug(entry)
+        if "slug" in entry:
+            fail(f"Remove the obsolete slug for {slug}; href is the only deck location.")
         # Windows and case-insensitive static hosts must agree about identities.
         if slug in seen:
             fail(f"Duplicate presentation slug: {slug}")
@@ -129,8 +184,9 @@ def check_catalog(catalog):
                 fail(f"Invalid date for {slug}; use YYYY-MM-DD.")
         if type(entry.get("slide_count")) is not int or entry["slide_count"] < 1:
             fail(f"Invalid slide_count for {slug}.")
-        if entry.get("cover") != f"{slug}/cover.webp":
-            fail(f"Cover for {slug} must be '{slug}/cover.webp'.")
+        cover = string_field(entry, "cover", required=True)
+        if not cover.endswith(".webp") or cover.startswith(f"{slug}/"):
+            fail(f"Cover for {slug} must be a deck-relative WebP path, such as 'cover.webp'.")
         tags = entry.get("tags", [])
         if not isinstance(tags, list) or any(not isinstance(t, str) or not t.strip() for t in tags):
             fail(f"tags for {slug} must be an array of nonempty strings.")
@@ -140,11 +196,13 @@ def check_catalog(catalog):
 def load_catalog(root):
     if root.is_symlink():
         fail(f"Archive directory cannot be a symlink: {root}")
-    path = root / "presentations.json"
+    if (root / "presentations.json").exists():
+        fail(MIGRATION_HINT)
+    path = root / "catalog.js"
     if path.is_symlink():
         fail(f"Catalog cannot be a symlink: {path}")
     if path.exists():
-        return check_catalog(read_json(path))
+        return check_catalog(read_data(path, CATALOG_VARIABLE))
     return {"generator": GENERATOR, "version": VERSION,
             "site": {"title": "Presentations", "theme": "programme"}, "presentations": []}
 
@@ -179,7 +237,8 @@ def generated_target(path):
         fail(f"Conflicting output path: {path}")
     if path.exists():
         try:
-            managed = MARKER in path.read_text(encoding="utf-8")[:600]
+            source = path.read_text(encoding="utf-8")[:600]
+            managed = MARKER in source or LEGACY_MARKER in source
         except (OSError, UnicodeError):
             managed = False
         if not managed:
@@ -202,17 +261,19 @@ def image_info(root, relative, expected=None):
     return size
 
 
-def check_deck(folder, entry):
+def check_deck(folder, entry, deck=None, check_count=True):
     if folder.is_symlink() or not folder.is_dir():
         fail(f"Missing or symlink presentation directory: {folder}")
-    manifest = local_file(folder, "deck.json")
-    deck = read_json(manifest)
-    check_header(deck, str(manifest))
-    if deck.get("slug") != entry["slug"]:
-        fail(f"Deck slug mismatch: {folder}")
+    if deck is None:
+        deck = read_data(local_file(folder, "deck.js"), DECK_VARIABLE)
+    check_header(deck, str(folder / "deck.js"))
+    if "slug" in deck:
+        fail(f"Remove the obsolete slug in {folder / 'deck.js'}; the catalog link locates this deck.")
     slides = deck.get("slides")
-    if not isinstance(slides, list) or not slides or len(slides) != entry["slide_count"]:
-        fail(f"Slide count mismatch: {folder}")
+    if not isinstance(slides, list) or not slides:
+        fail(f"Presentation must contain slides: {folder}")
+    if check_count and len(slides) != entry["slide_count"]:
+        fail(f"Slide count mismatch: {folder}. Run rebuild to recalculate catalog counts.")
     max_edge = deck.get("max_edge")
     quality = deck.get("quality")
     if type(max_edge) is not int or not 320 <= max_edge <= 4096 or type(quality) is not int or not 1 <= quality <= 95:
@@ -230,7 +291,7 @@ def check_deck(folder, entry):
                 fail(f"Invalid or duplicate slide asset: {path!r}")
             seen.add(path)
             image_info(folder, path, size if key == "src" else None)
-    image_info(folder, "cover.webp")
+    image_info(folder, entry["cover"])
     # Never let unrelated source documents silently enter the upload directory.
     for item in folder.rglob("*"):
         if item.is_symlink():
@@ -238,12 +299,6 @@ def check_deck(folder, entry):
         if item.suffix.lower() in (".pdf", ".pptx", ".ppt"):
             fail(f"Source document found in archive; move it outside presentations: {item}")
     return deck
-
-
-def js_companion(variable, value):
-    # External classic scripts, not executable user strings or inline scripts.
-    payload = json.dumps(value, ensure_ascii=True, separators=(",", ":"))
-    return f"/* {MARKER} */\nwindow.{variable} = {payload};\n"
 
 
 def render_html(title, theme, deck=False):
@@ -285,16 +340,15 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
 def build_files(root, catalog, decks, copy_player):
     files = {
-        Path("presentations.json"): json_text(catalog),
-        Path("catalog.js"): js_companion("PDFWebPublisherCatalog", catalog),
+        Path("catalog.js"): js_data(CATALOG_VARIABLE, catalog),
         Path("index.html"): render_html(catalog["site"]["title"], catalog["site"]["theme"]),
     }
     for entry in catalog["presentations"]:
-        slug = entry["slug"]
+        slug = entry_slug(entry)
         files[Path(slug) / "index.html"] = render_html(entry["title"], catalog["site"]["theme"], deck=True)
-        files[Path(slug) / "deck.js"] = js_companion("PDFWebPublisherDeck", decks[slug])
+        files[Path(slug) / "deck.js"] = js_data(DECK_VARIABLE, decks[slug])
     for relative in files:
-        if relative.name not in ("presentations.json",):
+        if relative.suffix == ".html":
             generated_target(root / relative)
     if copy_player:
         for name in PLAYER_FILES:
@@ -302,7 +356,7 @@ def build_files(root, catalog, decks, copy_player):
     return files
 
 
-def commit(root, files, staged_deck=None, slug=None):
+def commit(root, files, staged_deck=None, slug=None, removals=()):
     """Replace managed files as a unit; roll back ordinary write/rename failures."""
     existed = root.exists()
     root.mkdir(parents=True, exist_ok=True)
@@ -329,12 +383,17 @@ def commit(root, files, staged_deck=None, slug=None):
             else:
                 fresh.write_text(content, encoding="utf-8", newline="\n")
             # Newly staged deck wrappers have no previous files to preserve.
-            if target.exists():
+            if target.exists() and not (staged_deck is not None and relative.parts[0] == slug):
                 backup = transaction / f"old-{number}"
                 target.rename(backup)
                 backups.append((backup, target))
             os.replace(fresh, target)
             installed.append(target)
+        for number, relative in enumerate(removals):
+            target = local_file(root, Path(relative).as_posix())
+            backup = transaction / f"removed-{number}"
+            target.rename(backup)
+            backups.append((backup, target))
     except BaseException:
         for target in reversed(installed):
             if target.is_dir():
@@ -354,7 +413,7 @@ def commit(root, files, staged_deck=None, slug=None):
             root.rmdir()
 
 
-def render_pdf(source, destination, slug, max_edge, quality, cover_page):
+def render_pdf(source, destination, max_edge, quality, cover_page):
     import pypdfium2 as pdfium
     from PIL import Image
     stream = source.open("rb")
@@ -401,27 +460,32 @@ def render_pdf(source, destination, slug, max_edge, quality, cover_page):
                 cover.save(destination / "cover.webp", "WEBP", quality=50, method=6)
             slides.append({"src": f"slides/{name}", "thumbnail": f"thumbnails/{name}",
                            "width": image.width, "height": image.height})
-        manifest = {"generator": GENERATOR, "version": VERSION, "slug": slug,
+        manifest = {"generator": GENERATOR, "version": VERSION,
                     "max_edge": max_edge, "quality": quality, "cover_page": cover_page, "slides": slides}
-        write_json(destination / "deck.json", manifest)
+        write_data(destination / "deck.js", DECK_VARIABLE, manifest)
         return title, manifest
     finally:
         document.close()
         stream.close()
 
 
-def inspect_archive(root, catalog, replacing=None):
+def inspect_archive(root, catalog, replacing=None, check_counts=True):
     decks = {}
     for entry in catalog["presentations"]:
-        if entry["slug"] != replacing:
-            decks[entry["slug"]] = check_deck(root / entry["slug"], entry)
+        slug = entry_slug(entry)
+        if slug != replacing:
+            decks[slug] = check_deck(root / slug, entry, check_count=check_counts)
+    check_archive_files(root)
+    return decks
+
+
+def check_archive_files(root):
     if root.exists():
         for item in root.rglob("*"):
             if item.is_symlink():
                 fail(f"Symlinks are not supported in archives: {item}")
             if item.suffix.lower() in (".pdf", ".pptx", ".ppt"):
                 fail(f"Move source documents outside presentations before publishing: {item}")
-    return decks
 
 
 def publish(args):
@@ -436,7 +500,7 @@ def publish(args):
     if not 320 <= args.max_edge <= 4096 or not 1 <= args.quality <= 95:
         fail("--max-edge must be 320–4096 and --quality must be 1–95.")
     catalog = copy.deepcopy(load_catalog(root))
-    old = next((e for e in catalog["presentations"] if e["slug"] == slug), None)
+    old = next((e for e in catalog["presentations"] if entry_slug(e) == slug), None)
     if old and not args.replace:
         fail(f"Presentation '{slug}' already exists. Use --replace to replace it.")
     if not old and (root / slug).exists():
@@ -449,8 +513,8 @@ def publish(args):
     decks = inspect_archive(root, catalog, replacing=slug)
     with tempfile.TemporaryDirectory(prefix="pdf-web-publisher-") as temporary:
         staged = Path(temporary) / slug
-        pdf_title, manifest = render_pdf(source, staged, slug, args.max_edge, args.quality, args.cover_page)
-        entry = copy.deepcopy(old) if old else {"slug": slug, "tags": []}
+        pdf_title, manifest = render_pdf(source, staged, args.max_edge, args.quality, args.cover_page)
+        entry = copy.deepcopy(old) if old else {"href": f"{slug}/index.html", "tags": []}
         entry["title"] = args.title if args.title is not None else (entry.get("title") or pdf_title or source.stem)
         for key in ("speaker", "event", "date", "description"):
             value = getattr(args, key)
@@ -458,7 +522,7 @@ def publish(args):
                 entry[key] = value
         if args.tag is not None:
             entry["tags"] = list(dict.fromkeys(args.tag))
-        entry.update(cover=f"{slug}/cover.webp", slide_count=len(manifest["slides"]))
+        entry.update(cover="cover.webp", slide_count=len(manifest["slides"]))
         if old:
             catalog["presentations"][catalog["presentations"].index(old)] = entry
         else:
@@ -471,7 +535,7 @@ def publish(args):
         if old:
             # Keep unrelated files in a managed deck on replacement. Old generated
             # slide files are removed, but an author's extra material is preserved.
-            managed = {"deck.json", "deck.js", "index.html", "cover.webp"}
+            managed = {"deck.js", "index.html", "cover.webp"}
             managed.update(s[key] for s in previous_deck["slides"] for key in ("src", "thumbnail"))
             for item in (root / slug).rglob("*"):
                 relative = item.relative_to(root / slug)
@@ -492,31 +556,99 @@ def apply_site_options(catalog, args):
         catalog["site"]["title"] = args.site_title
 
 
+def legacy_deck(folder, entry):
+    value = read_json(local_file(folder, "deck.json"))
+    check_header(value, str(folder / "deck.json"), version=1)
+    if value.get("slug") != folder.name:
+        fail(f"Legacy deck slug does not match its directory: {folder}")
+    existing = folder / "deck.js"
+    if existing.exists():
+        check_header(read_data(local_file(folder, "deck.js"), DECK_VARIABLE), str(existing), version=1)
+    value.pop("slug")
+    value["version"] = VERSION
+    return check_deck(folder, entry, deck=value, check_count=False)
+
+
+def load_legacy_archive(root):
+    """Convert old authoritative JSON in memory; deletions happen only at commit."""
+    catalog = read_json(local_file(root, "presentations.json"))
+    check_header(catalog, "presentations.json", version=1)
+    if (root / "catalog.js").exists():
+        check_header(read_data(local_file(root, "catalog.js"), CATALOG_VARIABLE), "catalog.js", version=1)
+    entries = catalog.get("presentations")
+    if not isinstance(entries, list):
+        fail("Legacy presentations must be an array.")
+    for entry in entries:
+        if not isinstance(entry, dict):
+            fail("Every legacy presentation must be an object.")
+        slug = entry.get("slug")
+        check_slug(slug)
+        if entry.get("cover") != f"{slug}/cover.webp":
+            fail(f"Invalid legacy cover for {slug}.")
+        entry.pop("slug")
+        entry.update(href=f"{slug}/index.html", cover="cover.webp")
+    catalog["version"] = VERSION
+    check_catalog(catalog)
+    decks = {entry_slug(e): legacy_deck(root / entry_slug(e), e) for e in entries}
+    removals = [Path("presentations.json"), *(Path(slug) / "deck.json" for slug in decks)]
+    unlisted = {}
+    # Previously unlisted managed decks also lose their redundant JSON copy;
+    # unrelated files with a similar name are left alone.
+    for path in root.glob("*/deck.json"):
+        if path.parent.name in decks:
+            continue
+        try:
+            value = read_json(local_file(root, path.relative_to(root).as_posix()))
+        except PublishError:
+            continue
+        if not isinstance(value, dict) or value.get("generator") != GENERATOR or value.get("version") != 1:
+            continue
+        check_slug(path.parent.name)
+        entry = {"cover": "cover.webp"}
+        unlisted[Path(path.parent.name) / "deck.js"] = legacy_deck(path.parent, entry)
+        removals.append(path.relative_to(root))
+    return catalog, decks, removals, unlisted
+
+
 def rebuild(args):
     root = archive_root(args.output)
-    catalog = load_catalog(root)
-    if not (root / "presentations.json").exists():
-        fail("No presentations.json found. Publish a PDF first.")
+    legacy = (root / "presentations.json").exists()
+    removals, unlisted = [], {}
+    if legacy:
+        if not args.refresh_player:
+            fail(MIGRATION_HINT)
+        catalog, decks, removals, unlisted = load_legacy_archive(root)
+    else:
+        catalog = load_catalog(root)
+        if not (root / "catalog.js").exists():
+            fail("No catalog.js found. Publish a PDF first.")
+        decks = inspect_archive(root, catalog, check_counts=False)
+    for entry in catalog["presentations"]:
+        entry["slide_count"] = len(decks[entry_slug(entry)]["slides"])
     apply_site_options(catalog, args)
     check_catalog(catalog)
     copy_player = check_player(root, args.refresh_player)
-    decks = inspect_archive(root, catalog)
-    commit(root, build_files(root, catalog, decks, copy_player))
+    if legacy:
+        # Apply the same archive-wide checks after validating converted deck data.
+        check_archive_files(root)
+    files = build_files(root, catalog, decks, copy_player)
+    files.update((path, js_data(DECK_VARIABLE, value)) for path, value in unlisted.items())
+    commit(root, files, removals=removals)
     return {"archive": str(root), "presentations": len(decks), "theme": catalog["site"]["theme"]}
 
 
 def validate(args):
     root = archive_root(args.output)
-    if not (root / "presentations.json").is_file():
-        fail("No presentations.json found. Publish a PDF first.")
     catalog = load_catalog(root)
+    if not (root / "catalog.js").is_file():
+        fail("No catalog.js found. Publish a PDF first.")
     if check_player(root):
         fail("Shared player is absent. Run rebuild to restore it.")
     decks = inspect_archive(root, catalog)
     expected = build_files(root, catalog, decks, False)
     for relative, text in expected.items():
-        if relative.name == "presentations.json":
-            continue  # Human-readable JSON whitespace is not meaningful.
+        if relative.suffix == ".js":
+            continue  # Authoritative data was parsed and checked, not compared as text.
         actual = local_file(root, relative.as_posix()).read_text(encoding="utf-8")
         if actual != text:
             fail(f"Stale generated file: {relative}. Run rebuild.")
@@ -536,7 +668,7 @@ def parser():
     result = argparse.ArgumentParser(description=__doc__)
     commands = result.add_subparsers(dest="command", required=True)
     for name, help_text in (("publish", "Convert a PDF and update the gallery."),
-                            ("rebuild", "Rebuild browser files from editable JSON."),
+                            ("rebuild", "Refresh HTML and counts from editable JavaScript data; migrate v1 with --refresh-player."),
                             ("validate", "Check the archive without changing it.")):
         command = commands.add_parser(name, help=help_text)
         command.add_argument("--output", default=".", help="Parent directory; output is always <parent>/presentations.")

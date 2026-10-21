@@ -58,7 +58,7 @@
   function init() {
     const catalog = window.PDFWebPublisherCatalog;
     const main = document.getElementById("main");
-    if (!catalog || catalog.version !== 1 || !Array.isArray(catalog.presentations)) {
+    if (!catalog || catalog.version !== 2 || !Array.isArray(catalog.presentations)) {
       main.replaceChildren(notice("Archive data could not be loaded. Keep the whole presentations folder together, or run rebuild."));
       return null;
     }
@@ -67,5 +67,12 @@
     main.replaceChildren();
     return { catalog, main };
   }
-  window.PDFWebPublisher = { h, icon, button, formatDate, metadata, notice, init };
+  function pageURL(value, base = location.href) {
+    const url = new URL(value, base);
+    if (url.pathname.endsWith("/")) url.pathname += "index.html";
+    url.search = "";
+    url.hash = "";
+    return url.href;
+  }
+  window.PDFWebPublisher = { h, icon, button, formatDate, metadata, notice, init, pageURL };
 })();
