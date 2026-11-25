@@ -1,0 +1,22 @@
+{
+  "prompt": {
+    "task": "Transform the uploaded photograph into a standalone, premium-quality 3:2 HORIZONTAL design poster. The entire canvas must be a single, unified abstract graphic composition. Do NOT include any photorealistic sections or the original photo. Do NOT divide the canvas into sections.",
+    "subject_extraction": "Extract the photograph's essential visual identity: the subject's silhouette, structure, posture, and narrative relationships. Do not reproduce the entire object literally. Instead, distill these characteristics into a recognizable abstract visual symbol.",
+    "visual_direction": {
+      "styles": [
+        "Post-digital graphic design",
+        "Deconstructed Swiss design",
+        "Generative symbol systems",
+        "Diagrammatic abstraction"
+      ],
+      "techniques": "Use geometric deconstruction, modular forms, linear structures, negative space, and symbolic abstraction to create a distinctive visual identity. Incorporate geometric modules, fine lines, curved trajectories, grids, micro-symbols, numbering systems, and abstract nodes.",
+      "conceptual_tension": "Explore the tension between Order and Error; Precision and Handmade Imperfection; Digital and Analog; Rationality and Emotion. Achieve strong visual recognition with minimal elements."
+    },
+    "composition": "Maintain an extremely restrained horizontal composition. The abstract symbol should be the sole visual focal point, positioned centrally or slightly off-center, surrounded by generous negative space. Avoid multiple decorative icons or infographic-style layouts.",
+    "typography": "Typography should function only as a supporting system component, never as a dominant headline. Use small index numbers, minimal alphabetic codes, short descriptive phrases, and subtle annotations. Use refined, understated typography inspired by archival systems and technical documentation.",
+    "color_system": "Extract the photograph's signature colors and reinterpret them as a cohesive brand color palette. Introduce a limited number of high-recognition accent colors (e.g., Teal, Blue, Magenta, Orange). Balance these with off-white, warm white, and neutral gray backgrounds. Avoid chaotic palettes and generic gradients.",
+    "textures": "Integrate subtle physical imperfections and analog printing characteristics: Xerox texture, Risograph grain, print registration errors, scanner noise, subtle paper texture, delicate print misalignment, and imperfect edges to give the digital symbols a tactile quality.",
+    "final_quality": "The result should feel like a collectible piece of experimental graphic design from a contemporary art institution or independent design publication. It should communicate a strong identity through carefully controlled geometry, negative space, and a sophisticated visual system.",
+    "negative_prompt": "No photorealistic imagery, no photo collages, no split layouts, no dual-panel designs, no top/bottom division."
+  }
+}
