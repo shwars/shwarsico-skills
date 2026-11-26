@@ -1,0 +1,4 @@
+interface:
+  display_name: "Учебники в стиле Сошникова"
+  short_description: "Написание, редактура и проверка глав учебников"
+  default_prompt: "Используй $soshnikov-textbook-style, чтобы написать главу по моим тезисам и вычитать её перед выдачей."

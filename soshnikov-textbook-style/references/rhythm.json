@@ -1,0 +1,7 @@
+{
+  "ranges": {
+    "practical": {"sentences": [13, 20], "paragraphs": [18, 36]},
+    "theoretical": {"sentences": [11, 16], "paragraphs": [13.5, 38]},
+    "mixed": {"sentences": [11, 20], "paragraphs": [13.5, 38]}
+  }
+}
